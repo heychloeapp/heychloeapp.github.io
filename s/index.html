@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hey chloe</title>
+<style>
+  :root { color-scheme: light dark; --bg:#f6f5f2; --card:#fff; --text:#1c1c1e; --muted:#8a8a8e; --line:#e5e5ea; --accent:#3478f6; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#000; --card:#1c1c1e; --text:#f2f2f7; --muted:#8e8e93; --line:#38383a; --accent:#4a8cff; } }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px -apple-system, system-ui, sans-serif; }
+  main { max-width:480px; margin:0 auto; padding:32px 16px; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  .meta { color:var(--muted); font-size:14px; margin-bottom:16px; }
+  .card { background:var(--card); border-radius:16px; overflow:hidden; }
+  .row { display:flex; justify-content:space-between; gap:12px; padding:12px 16px; border-top:1px solid var(--line); }
+  .row:first-child { border-top:0; }
+  .row small { color:var(--muted); display:block; font-size:12px; }
+  .vals { color:var(--muted); font-size:14px; text-align:right; white-space:nowrap; }
+  .total { font-weight:600; }
+  a.open { display:block; margin-top:20px; padding:14px; text-align:center; border-radius:999px; background:var(--accent); color:#fff; text-decoration:none; font-weight:600; }
+</style>
+</head>
+<body>
+<main id="app"><h1>hey chloe</h1></main>
+<script>
+  // The share's foods live after the # and never leave the browser.
+  const app = document.getElementById('app');
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+  function decode(code) {
+    const b64 = code.replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(b64 + '='.repeat((4 - b64.length % 4) % 4));
+    return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))));
+  }
+  const m = /hcf1:([A-Za-z0-9_-]+)/.exec(location.hash);
+  let share = null;
+  try { share = m && decode(m[1]); } catch (e) { share = null; }
+  if (!share || share.v !== 1) {
+    app.innerHTML = '<h1>hey chloe</h1>';
+  } else {
+    const r1 = (v) => Math.round(v * 10) / 10;
+    const vals = (p, k) => [k != null ? Math.round(k) + ' kcal' : null, r1(p) + ' g protein'].filter(Boolean).join(' · ');
+    let tp = 0, tk = 0, anyK = false, rows = '';
+    for (const [meal, foods] of share.i) {
+      let p = 0, k = 0, hasK = false;
+      const lines = foods.map((f) => {
+        const q = f[1] || 1, sg = f[2] || 0, fp = (f[3] || 0) * q, fk = f[4] == null ? null : f[4] * q;
+        p += fp; if (fk != null) { k += fk; hasK = true; }
+        const amount = sg ? Math.round(q * sg) + ' g' : r1(q) + ' ×';
+        return { name: f[0], amount, v: vals(fp, fk) };
+      });
+      tp += p; if (hasK) { tk += k; anyK = true; }
+      if (meal && share.k === 'l') rows += `<div class="row"><div>${esc(meal)}<small>Meal · ${foods.length} foods</small></div><div class="vals">${vals(p, hasK ? k : null)}</div></div>`;
+      else rows += lines.map((l) => `<div class="row"><div>${esc(l.name)}<small>${esc(l.amount)}</small></div><div class="vals">${l.v}</div></div>`).join('');
+    }
+    const count = share.i.reduce((n, i) => n + i[1].length, 0);
+    const kind = share.k === 'f' ? 'Food' : share.k === 'm' ? `Meal · ${count} foods` : `List · ${share.i.length} items`;
+    if (share.k !== 'f') rows += `<div class="row total"><div>Total</div><div class="vals">${vals(tp, anyK ? tk : null)}</div></div>`;
+    app.innerHTML = `<h1>${esc(share.n || 'Shared food')}</h1><div class="meta">${kind}</div><div class="card">${rows}</div><a class="open" href="heychloe://entry?section=food${esc(location.hash)}">Open in hey chloe</a>`;
+  }
+</script>
+</body>
+</html>

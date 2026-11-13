@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>hey chloe</title>
+<meta property="og:title" content="Shared from hey chloe">
+<meta property="og:site_name" content="hey chloe">
 <style>
   :root { color-scheme: light dark; --bg:#f6f5f2; --card:#fff; --text:#1c1c1e; --muted:#8a8a8e; --line:#e5e5ea; --accent:#3478f6; }
   @media (prefers-color-scheme: dark) { :root { --bg:#000; --card:#1c1c1e; --text:#f2f2f7; --muted:#8e8e93; --line:#38383a; --accent:#4a8cff; } }
@@ -17,13 +19,16 @@
   .row small { color:var(--muted); display:block; font-size:12px; }
   .vals { color:var(--muted); font-size:14px; text-align:right; white-space:nowrap; }
   .total { font-weight:600; }
+  .head { font-weight:600; }
+  .gap { height:12px; }
+  .vals.wrap { white-space:normal; }
   a.open { display:block; margin-top:20px; padding:14px; text-align:center; border-radius:999px; background:var(--accent); color:#fff; text-decoration:none; font-weight:600; }
 </style>
 </head>
 <body>
 <main id="app"><h1>hey chloe</h1></main>
 <script>
-  // The share's foods live after the # and never leave the browser.
+  // The share lives after the # and never leaves the browser.
   const app = document.getElementById('app');
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
   function decode(code) {
@@ -31,10 +36,40 @@
     const bin = atob(b64 + '='.repeat((4 - b64.length % 4) % 4));
     return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))));
   }
+  function text(code) {
+    const b64 = code.replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(b64 + '='.repeat((4 - b64.length % 4) % 4));
+    return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+  }
+  // Any other share (a template, a plan, a workout; 2026-11-13): its whole text, after "#hct1:". Shown as its lines.
+  function showText(t) {
+    const lines = t.replace(/\r\n?/g, '\n').split('\n').map((l) => l.trim());
+    const first = /^hey chloe\s*·\s*([^:]+?)(?::\s*(.*))?$/i.exec(lines[0] || '');
+    const body = first ? lines.slice(1) : lines;
+    const rows = [], GAP = '\u0000';
+    for (const l of body) {
+      if (/^hey chloe hc1:/i.test(l) || /^https?:\/\//.test(l)) continue;
+      if (!l) { if (rows.length && rows[rows.length - 1] !== GAP) rows.push(GAP); continue; }
+      const parts = l.split(/\s+\|\s+/);
+      rows.push(parts.length > 1
+        ? `<div class="row"><div>${esc(parts[0])}</div><div class="vals wrap">${parts.slice(1).map(esc).join(' · ')}</div></div>`
+        : `<div class="row head"><div>${esc(l)}</div></div>`);
+    }
+    while (rows[rows.length - 1] === GAP) rows.pop();
+    const cards = rows.join('').split(GAP).filter(Boolean).map((r) => `<div class="card">${r}</div>`).join('<div class="gap"></div>');
+    const name = first ? (first[2] || first[1]) : 'Shared from hey chloe';
+    const kind = first && first[2] ? first[1] : '';
+    app.innerHTML = `<h1>${esc(name)}</h1><div class="meta">${esc(kind)}</div>${cards}<a class="open" href="heychloe://share${esc(location.hash)}">Open in hey chloe</a>`;
+  }
   const m = /hcf1:([A-Za-z0-9_-]+)/.exec(location.hash);
+  const t = /hct1:([A-Za-z0-9_-]+)/.exec(location.hash);
   let share = null;
   try { share = m && decode(m[1]); } catch (e) { share = null; }
-  if (!share || share.v !== 1) {
+  let shared = null;
+  try { shared = t && text(t[1]); } catch (e) { shared = null; }
+  if (shared) {
+    showText(shared);
+  } else if (!share || share.v !== 1) {
     app.innerHTML = '<h1>hey chloe</h1>';
   } else {
     const r1 = (v) => Math.round(v * 10) / 10;

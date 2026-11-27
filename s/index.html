@@ -56,7 +56,15 @@
     const bin = atob(b64 + '='.repeat((4 - b64.length % 4) % 4));
     return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
   }
-  // Any other share (a template, a plan, a workout; 2026-11-13): its whole text, after "#hct1:". Shown as its lines.
+  // A share's text packed with DEFLATE (2026-11-27: links short enough to always arrive), after "#hcz1:".
+  async function unpack(code) {
+    const b64 = code.replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(b64 + '='.repeat((4 - b64.length % 4) % 4));
+    const stream = new Blob([Uint8Array.from(bin, (c) => c.charCodeAt(0))]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new TextDecoder().decode(await new Response(stream).arrayBuffer());
+  }
+  // Any other share (a template, a plan, a workout; 2026-11-13): its whole text, after "#hcz1:" (or "#hct1:" before it
+  // was packed). Shown as its lines.
   function showText(t) {
     const lines = t.replace(/\r\n?/g, '\n').split('\n').map((l) => l.trim());
     const first = /^hey chloe\s*·\s*([^:]+?)(?::\s*(.*))?$/i.exec(lines[0] || '');
@@ -76,12 +84,14 @@
     const kind = first && first[2] ? first[1] : '';
     app.innerHTML = `<h1>${esc(name)}</h1><div class="meta">${esc(kind)}</div>${cards}<a class="open" href="heychloe://share${esc(location.hash)}">Open in hey chloe</a>`;
   }
+  (async () => {
   const m = /hcf1:([A-Za-z0-9_-]+)/.exec(location.hash);
   const t = /hct1:([A-Za-z0-9_-]+)/.exec(location.hash);
+  const z = /hcz1:([A-Za-z0-9_-]+)/.exec(location.hash);
   let share = null;
   try { share = m && decode(m[1]); } catch (e) { share = null; }
   let shared = null;
-  try { shared = t && text(t[1]); } catch (e) { shared = null; }
+  try { shared = z ? await unpack(z[1]) : t && text(t[1]); } catch (e) { shared = null; }
   if (shared) {
     showText(shared);
   } else if (!share || share.v !== 1) {
@@ -107,6 +117,7 @@
     if (share.k !== 'f') rows += `<div class="row total"><div>Total</div><div class="vals">${vals(tp, anyK ? tk : null)}</div></div>`;
     app.innerHTML = `<h1>${esc(share.n || 'Shared food')}</h1><div class="meta">${kind}</div><div class="card">${rows}</div><a class="open" href="heychloe://entry?section=food${esc(location.hash)}">Open in hey chloe</a>`;
   }
+  })();
 </script>
 </body>
 </html>
